@@ -1,0 +1,252 @@
+.. The Enhanced Listbox documentation master file, created by
+   sphinx-quickstart on Thu Feb 13 04:43:00 2025.
+   You can adapt this file completely to your liking, but it should at least
+   contain the root `toctree` directive.
+
+The Enhanced Listbox documentation
+==================================
+Written by Greg Walters
+-----------------------
+.. note::
+
+   I'm currently in the process of creating the actual demo and this documentation.  Things will SURELY change!!!!!!!!!!
+   
+   *Tech is not neutral, nor is it apolitical.*
+   
+.. image:: /images/EnhancedListboxDemo.png
+    :scale: 50%
+    
+Background
+************
+
+I originally created what became 'The Enhanced Listbox' a while ago when I was working on a Python Bible reader.  The reader was based on the `pySword project <https://crosswire.org/sword/index.jsp>`_ .  I wanted to use a listbox for the user to be able to select the various downloadable bible versions.  That was simple enough, but I wanted more.  I realized that a dedicated researcher would want to keep track of their favorite versions of the available Bibles.  That's what led to this 'enhanced' widget.
+
+In reality, there is nothing very special about The Enhanced Listbox.  It's just a stock ScrolledListbox.  The magic is provided by some creative Python programming.
+
+
+How it works
+*************
+
+The ScrolledListbox has it's background, selectbackground colours changed, along with the selectborderwidth and activestyle attributes are also modified from the "normal".  
+There are basically 5 functions that you need to copy out of the support module and place into your own file. 
+
+These are:
+
+* `do_enhlistbox_bindings`_
+* `on_listboxSelect`_
+* `load_listbox`_
+* `on_lbmotion`_
+* `manage_favorites`_
+
+In your startup function, you need to make two calls.  The first is to setup the bindings and the second is the function that sets up the colors for the various parts of the listbox and the font that is used to display the items in the listbox.
+
+.. code-block:: bash
+
+    do_enhlistbox_bindings
+    load_listbox(ListItems={yourlisthere})
+    
+We'll look at each of the functions one at a time and see any parameters you need to provide.
+
+
+do_enhlistbox_bindings
++++++++++++++++++++++++
+
+The first function is the **do_enhlistbox_bindings** function.  This function sets up an alias for the ScrolledListbox named listbox to save typing.  Next we create an empty list named favList and make it global.  Finally, we set three bindings for the ScrolledListbox.  The first is the normal virtual event <<ListboxSelect>>.  Next is the <Motion> event which is used by the on_lbmotion callback.  Last but not least, bind the <Button-3> (usually called the right click button) to a callback named **manage_favorites**.
+
+Here's the code...
+
+.. code-block:: python
+
+ def do_enhlistbox_bindings():
+    global listbox
+    listbox = _w1.Scrolledlistbox1
+    global favList
+    favList = []
+    listbox.bind("<<ListboxSelect>>", on_listboxSelect)
+    listbox.bind("<Motion>", on_lbmotion)
+    listbox.bind("<Button-3>", manage_favorites)
+
+
+on_listboxSelect
+++++++++++++++++++++
+
+Our first callback function is named on_listboxSelect. This is nothing more than the beginning of what you would normally use to obtain and handle the user's click selection.
+
+The first thing that gets done is retrieve the .curselection, which is an integer of the item that the user clicked on.  If the user clicks on the third item in the listbox that index gets returned as a tuple, like this (2,).   This allows for multiple selections to be returned. Then we get the text, based on the index that we just received.  To do this, we use the .get method, passing the single index (indx[0]).
+
+.. note::
+   Remember, that all indexes are zero based.  So if the user clicks on the first item in the list, indx will come back as (0,).
+   
+
+
+.. code-block:: python
+
+ def on_listboxSelect(e):
+    indx = _w1.Scrolledlistbox1.curselection()
+    itm = _w1.Scrolledlistbox1.get(indx[0])
+    # SelectedItem.set(f"Selected Item: {indx[0]} - {itm}")
+    print(f"Selected Item: {indx[0]} - {itm}")
+
+
+load_listbox
+++++++++++++++
+
+This function sets up the colours, the special attributes and loads the item list into the ScrolledListbox widget itself. Notice that there are four parameters with defaults.
+
+You can call this function by providing the list of items you want to display in the ScrolledListbox...
+
+   load_listbox(ListItems=movielist)
+   
+or you can provide your own colors when you call the function providing replacement colours.  Just sure you provide the parameter name and the colours as known Tk colours.
+
+.. warning::
+   The list must be provided as a parameter.
+
+   
+
+
+.. code-block:: python
+
+ def load_listbox(
+    ListboxBackground="lightgoldenrodyellow",
+    SelectionBackground="seagreen2",
+    FavoriteBackground="skyblue2",
+    ListItems=[],):
+
+    global listboxBg, selectBg, favBg, listitems
+    listboxBg = ListboxBackground
+    selectBg = SelectionBackground
+    favBg = FavoriteBackground
+    listbox.configure(background=listboxBg)
+    listbox.configure(selectbackground=selectBg)
+    listbox.configure(selectborderwidth=2)
+    listbox.configure(activestyle=NONE)
+    listbox.configure(font="-family {DejaVuSansMono} -size 10")
+    listbox.configure(takefocus=0)
+    for itm in ListItems:
+        _w1.Scrolledlistbox1.insert("end", itm)
+
+
+
+
+on_lbmotion
+++++++++++++
+
+Now for the important callback functions.  The first is called whenever the user moved the mouse pointer entirely within the Listbox widget.  This is due to our binding the <Motion> event back in the do_enhlistbox_bindings function.
+
+.. code-block:: python
+
+ def on_lbmotion(event):
+    global listbox
+    global mousex, mousey
+    x, y = event.x, event.y
+    mousex = x
+    mousey = y
+
+
+
+manage_favorites
++++++++++++++++++
+
+Finally, the last callback function is called whenever the <Button-3> (normally referred to as the 'right click' mouse button). First, we get the x and y positions from of the mouse pointer, and find the nearest list item (pos).  Then we do pretty much the same thing that we do in the standard Listbox callback function.  The text of the list item is held in the variable 'itm'.  Then we compare this value with what is in our favorite list.  If it is there, we remove it from the list and set the background colour to the one we assigned to the listbox.  If, on the other hand it is not in the list, we add it to the list, then set the background color to the favorite background colour.
+
+
+.. code-block:: python
+
+ def manage_favorites(*args):
+    global textbox, listbox
+    global favList
+    global listboxBg, selectBg, favBg
+
+    if _debug:
+        print("Into function manage_favorites")
+        print(args)
+        for arg in args:
+            print(f"   {arg}")
+    global mousex, mousey
+    X = listbox.winfo_pointerx()
+    y = listbox.winfo_pointery()
+    pos = listbox.nearest(mousey)
+    indx = listbox.curselection()
+    itm = listbox.get(pos)
+    tagname = itm
+
+    if itm in favList:
+        favList.remove(itm)
+        # listbox.itemconfig(pos, background="lightgoldenrodyellow")
+        listbox.itemconfig(pos, background=listboxBg)
+        # _w1.StatusInfo2.set(f"  User removed {itm} from list")
+    else:
+        favList.append(itm)
+        # listbox.itemconfigure(pos, background="skyblue2")
+        listbox.itemconfigure(pos, background=favBg)
+        # _w1.StatusInfo2.set(f"  User added {itm} to list")
+
+That's it.  Feel free to use this project in your own code.  You can find the actual code in the demo support module.
+
+Thank you for checking out my Enhanced Listbox project!!!
+
+
+
+About PAGE
+*******************
+
+PAGE is a drag-and-drop GUI generator for Python and Tkinter which
+generates Python modules that display a relatively simple GUI
+constructed from Tk and Ttk widget sets using the Place Geometry
+Manager. PAGE supports the construction of multiple toplevel GUI's.
+
+PAGE is a cross-platform tool running on any OS that has a current
+version of Python installed. PAGE output requires only Python Tkinter
+and runs on Linux, Unix, Windows, and even Rasperian.
+
+Version 8 is a major release which incorporates initial support of Ttk
+themes.
+
+You can find PAGE at `<https://sourceforge/projects/page/>`_
+
+
+
+
+About The Author
+*******************
+
+I am Greg Walters.  A semi-retired programmer with over 50 years of programming experience, author with over 125 articles on Python and MicroPython in `Full Circle magazine <https://fullcirclemagazine.org>`_ , two books (on Python programming) fully written by me and one that I co-authored.
+
+Currently, I live somewhere in Central Texas, USA with my adult son, who is a complete and utter blessing to me.  As to work...well I am currently working with Don Rozenberg (the author of `PAGE <https://sourceforge.net/projects/page/>`_ and I love creating programs as demos for PAGE users and for myself.  I also offer unpaid support for users of PAGE both on the PAGE forum and the PAGE Discord support channel.
+
+
+
+*This is a work of nonfiction. No names have been changed, no characters invented, no events fabricated.  However, I make no warranties of MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE.  In other words, you can use my code, please give me credit where credit is due but I don't promise that there are not any bugs in it!!!! :o)*
+
+
+
+Contact me
+***********
+
+There are various ways to contact me...
+
+   `My Webpage <http://thedesignatedgeek.xyz/>`_  
+   
+   email: `<designatedgeeksoftware@proton.me>`_
+   
+   Discord: `<https://discord.gg/vm6mTt9FDZ>`_  (look for *thedesignatedgeek1953*)
+   
+
+
+
+
+License
+**********
+This work, as is all of my work (except at this time the books), is licensed under the MIT license `<https://opensource.org/license/mit>`_
+
+
+
+
+
+
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Contents:
+
